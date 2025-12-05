@@ -1,3 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
-train.h5
-val.h5
+env/
+
+# Data files (large)
+*.h5
+*.pth
+*.pkl
+data/
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
