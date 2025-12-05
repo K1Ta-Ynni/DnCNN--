@@ -1,0 +1,51 @@
+1. 数据加载优化
+# dataset.py 中修改 Dataset 类
+class Dataset(udata.Dataset):
+    def __init__(self, train=True):
+        super(Dataset, self).__init__()
+        self.train = train
+        filename = 'train.h5' if train else 'val.h5'
+        # 保持文件一直打开，避免重复打开关闭
+        self.h5f = h5py.File(filename, 'r')
+        self.keys = list(self.h5f.keys())
+        random.shuffle(self.keys)
+    
+    def __len__(self):
+        return len(self.keys)
+    
+    def __getitem__(self, index):
+        key = self.keys[index]
+        data = np.array(self.h5f[key])
+        return torch.Tensor(data)
+    
+    def __del__(self):
+        if hasattr(self, 'h5f'):
+            self.h5f.close()
+2. 训练过程优化
+# train.py 中的修改
+def main():
+    # 添加混合精度训练
+    scaler = torch.cuda.amp.GradScaler()  # 如果使用torch<1.6，需要检查兼容性
+    
+    for i, data in enumerate(loader_train, 0):
+        model.train()
+        optimizer.zero_grad()
+        img_train = data.cuda()  # 提前移动到GPU
+        
+        with torch.cuda.amp.autocast():  # 自动混合精度
+            # 噪声生成
+            if opt.mode == 'S':
+                noise = torch.randn_like(img_train) * (opt.noiseL/255.)
+            elif opt.mode == 'B':
+                stdN = torch.rand(img_train.size(0)) * (55/255.)
+                noise = torch.randn_like(img_train) * stdN.view(-1, 1, 1, 1)
+            
+            imgn_train = img_train + noise
+            out_train = model(imgn_train)
+            loss = criterion(out_train, noise) / (imgn_train.size(0) * 2)
+        
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+        
+        # 其余代码保持不变...
